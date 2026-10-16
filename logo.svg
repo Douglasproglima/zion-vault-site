@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <defs>
+    <!-- Gradiente de Fundo do Cofre -->
+    <radialGradient id="bgGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#0e171b" />
+      <stop offset="100%" stop-color="#05080a" />
+    </radialGradient>
+
+    <!-- Gradiente Sci-Fi Neon (Verde Matrix para Ciano Frio) -->
+    <linearGradient id="neonGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00FF9D" />
+      <stop offset="100%" stop-color="#00D2FF" />
+    </linearGradient>
+
+    <!-- Filtro de Brilho Cyberpunk -->
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="8" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+
+  <!-- Fundo Sólido para Adaptive Icon -->
+  <rect width="512" height="512" rx="115" fill="url(#bgGlow)" />
+
+  <!-- Escudo / Portal Hexagonal Externo -->
+  <polygon points="256,48 424,144 424,368 256,464 88,368 88,144"
+           fill="none"
+           stroke="#16282d"
+           stroke-width="8" />
+
+  <!-- Hexágono Interno com Destaque -->
+  <polygon points="256,76 396,156 396,356 256,436 116,356 116,156"
+           fill="#070c0e"
+           stroke="url(#neonGradient)"
+           stroke-width="5"
+           filter="url(#glow)" />
+
+  <!-- Monograma Z Geométrico (Estilo Chave Criptográfica) -->
+  <g fill="url(#neonGradient)">
+    <!-- Barra Superior do Z -->
+    <path d="M176 172 H336 V208 H242 L336 216 V232 L220 312 H336 V340 H176 V304 L292 224 H176 Z" />
+
+    <!-- Ponto Central do Núcleo do Cofre -->
+    <circle cx="256" cy="256" r="10" fill="#00FF9D" />
+
+    <!-- Linhas de Circuito/Chave Integrada -->
+    <circle cx="176" cy="172" r="5" />
+    <circle cx="336" cy="340" r="5" />
+  </g>
+</svg>

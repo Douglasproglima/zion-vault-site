@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Zion Vault: cofre de senhas local, zero-knowledge</title>
+<style>
+  @font-face {
+    font-family: 'Sora';
+    src: url('fonts/Sora-Variable.ttf') format('truetype-variations');
+    font-weight: 400 800;
+    font-display: swap;
+  }
+  @font-face {
+    font-family: 'JetBrains Mono';
+    src: url('fonts/JetBrainsMono-Regular.ttf') format('truetype');
+    font-weight: 400;
+    font-display: swap;
+  }
+
+  :root, :root[data-theme="dark"] {
+    --bg: #06121F;
+    --surface: #0A1928;
+    --field: #081623;
+    --line: #173242;
+    --text: #E7EDEC;
+    --muted: #8FA6B2;
+
+    --accent: #00D2FF;
+    --frame: rgba(0, 210, 255, .40);
+    --frame-glow: rgba(0, 210, 255, .85);
+
+    --emblem-1: #00FF9D;
+    --emblem-2: #00D2FF;
+    --hex-outer: #173242;
+    --hex-fill: rgba(0, 255, 157, .12);
+    --glow: rgba(0, 255, 157, .10);
+
+    --btn: #00FF9D;
+    --btn-hover: #33FFB1;
+    --btn-text: #06121F;
+    --btn-shadow: rgba(0, 255, 157, .45);
+
+    --warning: #FFC857;
+    --card-shadow: 0 30px 80px -40px rgba(0, 210, 255, .35);
+    --scan: rgba(0, 210, 255, .05);
+
+    color-scheme: dark;
+  }
+
+  :root[data-theme="light"] {
+    --bg: #F4F8F9;
+    --surface: #FFFFFF;
+    --field: #FFFFFF;
+    --line: #C9D7DD;
+    --text: #0B1A24;
+    --muted: #4F6573;
+
+    --accent: #0088B5;
+    --frame: rgba(0, 136, 181, .35);
+    --frame-glow: rgba(0, 163, 217, .45);
+
+    --emblem-1: #00C27A;
+    --emblem-2: #0094C6;
+    --hex-outer: #D5E3E8;
+    --hex-fill: rgba(0, 194, 122, .10);
+    --glow: rgba(0, 194, 122, .12);
+
+    --btn: #00C27A;
+    --btn-hover: #00D486;
+    --btn-text: #06121F;
+    --btn-shadow: rgba(0, 154, 99, .35);
+
+    --warning: #8A5A00;
+    --card-shadow: 0 30px 80px -45px rgba(0, 136, 181, .25);
+    --scan: rgba(0, 136, 181, .04);
+
+    color-scheme: light;
+  }
+
+  @media (prefers-color-scheme: light) {
+    :root:not([data-theme]) {
+      --bg: #F4F8F9; --surface: #FFFFFF; --field: #FFFFFF; --line: #C9D7DD;
+      --text: #0B1A24; --muted: #4F6573;
+      --accent: #0088B5; --frame: rgba(0,136,181,.35); --frame-glow: rgba(0,163,217,.45);
+      --emblem-1: #00C27A; --emblem-2: #0094C6; --hex-outer: #D5E3E8; --hex-fill: rgba(0,194,122,.10);
+      --glow: rgba(0,194,122,.12); --btn: #00C27A; --btn-hover: #00D486; --btn-text: #06121F;
+      --btn-shadow: rgba(0,154,99,.35); --warning: #8A5A00;
+      --card-shadow: 0 30px 80px -45px rgba(0,136,181,.25); --scan: rgba(0,136,181,.04);
+      color-scheme: light;
+    }
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Sora', system-ui, sans-serif;
+    font-weight: 400;
+    line-height: 1.55;
+    overflow-x: hidden;
+    transition: background .3s ease, color .3s ease;
+  }
+  .mono {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+  }
+  .eyebrow {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 0.72rem;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--accent);
+    display: flex;
+    align-items: center;
+    gap: 0.6em;
+  }
+  .eyebrow::before {
+    content: "";
+    width: 1.4em;
+    height: 1px;
+    background: var(--accent);
+    opacity: .7;
+  }
+  h1, h2, h3 { text-wrap: balance; margin: 0; font-weight: 600; }
+  p { margin: 0; }
+  a { color: inherit; }
+  img { max-width: 100%; display: block; }
+
+  .shell {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 0 clamp(20px, 5vw, 56px);
+  }
+
+  /* ---------- corner frame motif (reaproveita o do login) ---------- */
+  .corner-frame {
+    position: absolute;
+    inset: clamp(18px, 3vw, 40px);
+    pointer-events: none;
+  }
+  .corner-frame span {
+    position: absolute;
+    width: 46px;
+    height: 46px;
+    border: 1px solid var(--frame);
+  }
+  .corner-frame span:nth-child(1) { top: 0; left: 0; border-right: none; border-bottom: none; }
+  .corner-frame span:nth-child(2) { top: 0; right: 0; border-left: none; border-bottom: none; }
+  .corner-frame span:nth-child(3) { bottom: 0; left: 0; border-right: none; border-top: none; }
+  .corner-frame span:nth-child(4) { bottom: 0; right: 0; border-left: none; border-top: none; }
+
+  /* ---------- top bar ---------- */
+  .topbar {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px clamp(20px, 5vw, 56px);
+    background: color-mix(in srgb, var(--bg) 82%, transparent);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--line);
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+  }
+  .brand img { width: 26px; height: 26px; }
+  .theme-toggle {
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    border: 1px solid var(--line);
+    background: var(--surface);
+    color: var(--text);
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+  }
+  .theme-toggle:focus-visible, a:focus-visible, button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  /* ---------- hero ---------- */
+  .hero {
+    position: relative;
+    padding: clamp(72px, 12vw, 140px) 0 clamp(64px, 10vw, 110px);
+    text-align: center;
+    overflow: hidden;
+  }
+  .hero::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(var(--scan) 1px, transparent 1px),
+      linear-gradient(90deg, var(--scan) 1px, transparent 1px);
+    background-size: 42px 42px;
+    mask-image: radial-gradient(ellipse 70% 60% at 50% 20%, black, transparent);
+    pointer-events: none;
+  }
+  .hero-inner { position: relative; z-index: 1; }
+  .hero-eyebrow { justify-content: center; margin-bottom: 28px; }
+  .hero-eyebrow::before, .hero-eyebrow::after {
+    content: "";
+    width: 1.4em;
+    height: 1px;
+    background: var(--accent);
+    opacity: .7;
+  }
+  .hero-eyebrow { gap: 0.8em; }
+
+  .emblem {
+    width: 128px;
+    height: 128px;
+    margin: 0 auto 34px;
+    position: relative;
+  }
+  .emblem svg { width: 100%; height: 100%; filter: drop-shadow(0 0 22px var(--glow)); }
+  @media (prefers-reduced-motion: no-preference) {
+    .emblem .pulse { animation: pulse 3.2s ease-in-out infinite; transform-origin: center; }
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: .55; }
+    50% { opacity: 1; }
+  }
+
+  .wordmark {
+    font-size: clamp(2.6rem, 7vw, 4.6rem);
+    letter-spacing: 0.02em;
+    font-weight: 700;
+  }
+  .wordmark .vault {
+    background: linear-gradient(100deg, var(--emblem-1), var(--emblem-2));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .tagline {
+    margin-top: 14px;
+    font-size: clamp(1.05rem, 2vw, 1.3rem);
+    color: var(--muted);
+    font-style: italic;
+  }
+  .hero-copy {
+    max-width: 640px;
+    margin: 26px auto 0;
+    font-size: 1.02rem;
+    color: var(--muted);
+  }
+  .hero-copy strong { color: var(--text); font-weight: 600; }
+
+  .hero-actions {
+    margin-top: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 18px;
+    flex-wrap: wrap;
+  }
+  .btn-primary {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.82rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    background: var(--btn);
+    color: var(--btn-text);
+    border: none;
+    padding: 14px 28px;
+    border-radius: 12px;
+    box-shadow: 0 10px 30px -8px var(--btn-shadow);
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-block;
+  }
+  .btn-primary:hover { background: var(--btn-hover); }
+  .btn-ghost {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.82rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    background: transparent;
+    color: var(--text);
+    border: 1px solid var(--line);
+    padding: 14px 28px;
+    border-radius: 12px;
+    text-decoration: none;
+    display: inline-block;
+  }
+  .hero-meta {
+    margin-top: 36px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72rem;
+    color: var(--muted);
+    letter-spacing: 0.04em;
+  }
+
+  /* ---------- section shell ---------- */
+  section.band { padding: clamp(64px, 9vw, 104px) 0; border-top: 1px solid var(--line); }
+  .section-head { max-width: 640px; margin-bottom: 44px; }
+  .section-head h2 { font-size: clamp(1.5rem, 3vw, 2rem); margin-top: 16px; }
+  .section-head p { margin-top: 14px; color: var(--muted); font-size: 1rem; }
+
+  /* ---------- pillars ---------- */
+  .pillars {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+    gap: 1px;
+    background: var(--line);
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    overflow: hidden;
+  }
+  .pillar {
+    background: var(--surface);
+    padding: 30px 26px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .pillar .mono {
+    font-size: 0.68rem;
+    letter-spacing: 0.1em;
+    color: var(--accent);
+    text-transform: uppercase;
+  }
+  .pillar h3 { font-size: 1.08rem; }
+  .pillar p { color: var(--muted); font-size: 0.92rem; }
+
+  /* ---------- security spec sheet ---------- */
+  .spec-sheet {
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    background: var(--field);
+    overflow: hidden;
+  }
+  .spec-row {
+    display: grid;
+    grid-template-columns: minmax(160px, 260px) 1fr;
+    gap: 24px;
+    padding: 18px 26px;
+    border-top: 1px solid var(--line);
+    align-items: baseline;
+  }
+  .spec-row:first-child { border-top: none; }
+  @media (max-width: 560px) {
+    .spec-row {
+      grid-template-columns: 1fr;
+      gap: 6px;
+    }
+  }
+  .spec-key {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.82rem;
+    color: var(--accent);
+    letter-spacing: 0.03em;
+  }
+  .spec-val { color: var(--text); font-size: 0.95rem; overflow-wrap: anywhere; }
+  .spec-val span { color: var(--muted); }
+
+  /* ---------- screenshots ---------- */
+  .shots {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 20px;
+  }
+  .shot-frame {
+    border: 1px solid var(--line);
+    border-radius: 20px;
+    padding: 10px;
+    background: linear-gradient(180deg, var(--surface), var(--field));
+    box-shadow: var(--card-shadow);
+  }
+  .shot-frame img { border-radius: 12px; width: 100%; }
+  .shot-frame .light-img { display: none; }
+  :root[data-theme="light"] .shot-frame .dark-img { display: none; }
+  :root[data-theme="light"] .shot-frame .light-img { display: block; }
+  @media (prefers-color-scheme: light) {
+    :root:not([data-theme]) .shot-frame .dark-img { display: none; }
+    :root:not([data-theme]) .shot-frame .light-img { display: block; }
+  }
+  .shot-caption {
+    margin-top: 12px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72rem;
+    color: var(--muted);
+    text-align: center;
+    letter-spacing: 0.03em;
+  }
+
+  /* ---------- compat grid ---------- */
+  .compat-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+    gap: 14px;
+  }
+  .compat-chip {
+    aspect-ratio: 1;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: var(--surface);
+    display: grid;
+    place-items: center;
+    padding: 16px;
+  }
+  .compat-chip img { width: 100%; height: 100%; object-fit: contain; }
+  .compat-note {
+    margin-top: 22px;
+    font-size: 0.84rem;
+    color: var(--muted);
+  }
+
+  /* ---------- status strip ---------- */
+  .status-strip {
+    border: 1px dashed var(--line);
+    border-radius: 14px;
+    padding: 18px 22px;
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+    font-size: 0.86rem;
+    color: var(--muted);
+  }
+  .status-strip .dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--warning);
+    margin-top: 7px;
+    flex-shrink: 0;
+  }
+  .status-strip strong { color: var(--text); }
+
+  footer {
+    border-top: 1px solid var(--line);
+    padding: 40px 0 56px;
+  }
+  .footer-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 16px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72rem;
+    color: var(--muted);
+    letter-spacing: 0.03em;
+  }
+  .footer-row .brand { font-size: 0.82rem; }
+</style>
+</head>
+
+<body>
+  <div class="topbar">
+    <div class="brand">
+      <img src="logo.svg" alt="" />
+      <span>ZION VAULT</span>
+    </div>
+    <button class="theme-toggle" id="themeToggle" aria-label="Alternar tema claro/escuro">
+      <svg id="themeIcon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+        <circle cx="12" cy="12" r="4.4"></circle>
+        <path d="M12 2.5v2.4M12 19.1v2.4M4.2 4.2l1.7 1.7M18.1 18.1l1.7 1.7M2.5 12h2.4M19.1 12h2.4M4.2 19.8l1.7-1.7M18.1 5.9l1.7-1.7" stroke-linecap="round"></path>
+      </svg>
+    </button>
+  </div>
+
+  <header class="hero">
+    <div class="corner-frame"><span></span><span></span><span></span><span></span></div>
+    <div class="shell hero-inner">
+      <p class="eyebrow hero-eyebrow">ACESSO AUTORIZADO · COFRE PESSOAL</p>
+
+      <div class="emblem">
+        <svg viewBox="0 0 100 100" class="pulse">
+          <polygon points="50,6 90,28 90,72 50,94 10,72 10,28" fill="none" stroke="var(--hex-outer)" stroke-width="2"></polygon>
+          <polygon points="50,18 78,34 78,66 50,82 22,66 22,34" fill="var(--hex-fill)" stroke="url(#g)" stroke-width="2.4"></polygon>
+          <path d="M38 40 L62 40 L40 60 L62 60" fill="none" stroke="url(#g)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"></path>
+          <defs>
+            <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" stop-color="var(--emblem-1)"></stop>
+              <stop offset="1" stop-color="var(--emblem-2)"></stop>
+            </linearGradient>
+          </defs>
+        </svg>
+      </div>
+
+      <h1 class="wordmark">ZION<span class="vault"> VAULT</span></h1>
+      <p class="tagline">Your secrets. Your vault. Your control.</p>
+
+      <p class="hero-copy">
+        Um cofre pessoal de credenciais, senhas, cartões, contas, notas seguras.
+        <strong>100% local, offline-first, zero-knowledge.</strong> Sem backend
+        próprio. Sem conta na nuvem obrigatória. Sem telemetria. O único lugar
+        onde seus dados saem do aparelho é um backup opcional, e mesmo esse
+        backup já sai cifrado.
+      </p>
+
+      <div class="hero-actions">
+        <a class="btn-primary" href="#seguranca">Ver como protege seus dados</a>
+        <a class="btn-ghost" href="#telas">Ver o app</a>
+      </div>
+
+      <p class="hero-meta mono">APP ANDROID · CLEAN ARCHITECTURE · AES-256-GCM · ARGON2ID</p>
+    </div>
+  </header>
+
+  <section class="band" id="pilares">
+    <div class="shell">
+      <div class="section-head">
+        <p class="eyebrow">Por que existe</p>
+        <h2>Feito pra nunca precisar confiar em ninguém além de você.</h2>
+        <p>Quatro decisões que guiam cada linha do projeto, antes de qualquer feature nova.</p>
+      </div>
+      <div class="pillars">
+        <div class="pillar">
+          <span class="mono">01</span>
+          <h3>Local e offline-first</h3>
+          <p>O cofre mora no seu aparelho. Funciona sem internet, sem depender de nenhum servidor estar de pé.</p>
+        </div>
+        <div class="pillar">
+          <span class="mono">02</span>
+          <h3>Zero-knowledge</h3>
+          <p>Nem o próprio app consegue ler seus dados sem a senha mestra ou a Recovery Key. Ninguém mais tem essa chave.</p>
+        </div>
+        <div class="pillar">
+          <span class="mono">03</span>
+          <h3>Fail secure</h3>
+          <p>Sem senha mestra e sem Recovery Key, o cofre é irrecuperável por design. Não é um bug, é a garantia de que não existe porta dos fundos.</p>
+        </div>
+        <div class="pillar">
+          <span class="mono">04</span>
+          <h3>Sem overengineering</h3>
+          <p>Arquitetura limpa onde agrega valor de verdade, nada além do necessário pra proteger o que importa.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="band" id="seguranca">
+    <div class="shell">
+      <div class="section-head">
+        <p class="eyebrow">Segurança, em uma olhada</p>
+        <h2>Cada camada tem um motivo técnico, documentado publicamente.</h2>
+      </div>
+      <div class="spec-sheet mono">
+        <div class="spec-row">
+          <span class="spec-key">DERIVAÇÃO DE CHAVE</span>
+          <span class="spec-val">Argon2id <span>: resistente a ataque por GPU/ASIC, não PBKDF2</span></span>
+        </div>
+        <div class="spec-row">
+          <span class="spec-key">CIFRAGEM</span>
+          <span class="spec-val">AES-256-GCM <span>: autenticado, por item, nunca o banco inteiro cifrado de uma vez</span></span>
+        </div>
+        <div class="spec-row">
+          <span class="spec-key">ARMAZENAMENTO DE CHAVE</span>
+          <span class="spec-val">Android Keystore <span>: via flutter_secure_storage, nunca em SharedPreferences</span></span>
+        </div>
+        <div class="spec-row">
+          <span class="spec-key">BIOMETRIA</span>
+          <span class="spec-val">Gate de conveniência <span>: nunca substitui a criptografia, só o jeito de destravar</span></span>
+        </div>
+        <div class="spec-row">
+          <span class="spec-key">RECUPERAÇÃO</span>
+          <span class="spec-val">Recovery Key de 256 bits <span>: mostrada uma única vez, não uma pergunta secreta adivinhável</span></span>
+        </div>
+        <div class="spec-row">
+          <span class="spec-key">BACKUP</span>
+          <span class="spec-val">Manual, no Google Drive <span>: sobe só o blob já cifrado, nunca o dado em texto plano</span></span>
+        </div>
+        <div class="spec-row">
+          <span class="spec-key">TELA</span>
+          <span class="spec-val">FLAG_SECURE <span>: bloqueia print, gravação de tela e thumbnail em Recentes</span></span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="band" id="telas">
+    <div class="shell">
+      <div class="section-head">
+        <p class="eyebrow">O app</p>
+        <h2>Simples de usar todo dia, sem abrir mão de nada técnico por baixo.</h2>
+      </div>
+      <div class="shots">
+        <div>
+          <div class="shot-frame">
+            <img class="dark-img" src="shots/home-dark.png" alt="Tela inicial do Zion Vault, tema escuro, categorias e credenciais recentes" />
+            <img class="light-img" src="shots/home-light.png" alt="Tela inicial do Zion Vault, tema claro" />
+          </div>
+          <p class="shot-caption">HOME</p>
+        </div>
+        <div>
+          <div class="shot-frame">
+            <img class="dark-img" src="shots/desbloquear-dark.png" alt="Tela de desbloqueio do cofre, tema escuro" />
+            <img class="light-img" src="shots/desbloquear-light.png" alt="Tela de desbloqueio do cofre, tema claro" />
+          </div>
+          <p class="shot-caption">DESBLOQUEIO</p>
+        </div>
+        <div>
+          <div class="shot-frame">
+            <img class="dark-img" src="shots/formulario-credencial.png" alt="Formulário de cadastro de credencial" />
+            <img class="light-img" src="shots/formulario-credencial.png" alt="Formulário de cadastro de credencial" />
+          </div>
+          <p class="shot-caption">NOVA CREDENCIAL</p>
+        </div>
+        <div>
+          <div class="shot-frame">
+            <img class="dark-img" src="shots/categoria-lista.png" alt="Lista de credenciais agrupadas por categoria" />
+            <img class="light-img" src="shots/categoria-lista.png" alt="Lista de credenciais agrupadas por categoria" />
+          </div>
+          <p class="shot-caption">POR CATEGORIA</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="band" id="compativel">
+    <div class="shell">
+      <div class="section-head">
+        <p class="eyebrow">Catálogo</p>
+        <h2>Reconhece o serviço, você só preenche a senha.</h2>
+      </div>
+      <div class="compat-grid">
+        <div class="compat-chip"><img src="services/nubank.png" alt="Nubank" /></div>
+        <div class="compat-chip"><img src="services/itau.png" alt="Itaú" /></div>
+        <div class="compat-chip"><img src="services/inter.png" alt="Banco Inter" /></div>
+        <div class="compat-chip"><img src="services/caixa.png" alt="Caixa" /></div>
+        <div class="compat-chip"><img src="services/bradesco.png" alt="Bradesco" /></div>
+        <div class="compat-chip"><img src="services/gmail.png" alt="Gmail" /></div>
+        <div class="compat-chip"><img src="services/whatsapp.png" alt="WhatsApp" /></div>
+        <div class="compat-chip"><img src="services/instagram.png" alt="Instagram" /></div>
+        <div class="compat-chip"><img src="services/x.png" alt="X" /></div>
+        <div class="compat-chip"><img src="services/linkedin.png" alt="LinkedIn" /></div>
+        <div class="compat-chip"><img src="services/netflix.png" alt="Netflix" /></div>
+        <div class="compat-chip"><img src="services/spotify.png" alt="Spotify" /></div>
+        <div class="compat-chip"><img src="services/mercadolivre.png" alt="Mercado Livre" /></div>
+        <div class="compat-chip"><img src="services/picpay.png" alt="PicPay" /></div>
+      </div>
+      <p class="compat-note">E qualquer outro serviço, com um campo de título livre, pra quando o catálogo ainda não cobre.</p>
+    </div>
+  </section>
+
+  <section class="band">
+    <div class="shell">
+      <div class="status-strip">
+        <span class="dot"></span>
+        <span>
+          <strong>Projeto pessoal, construído a céu aberto.</strong>
+          Uso próprio, sem publicação em lojas e sem auditoria de segurança de
+          terceiros ainda. Toda decisão de arquitetura está documentada e
+          justificada, não só implementada. Nada aqui é garantia, é engenharia
+          feita com o máximo de cuidado possível.
+        </span>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <div class="shell footer-row">
+      <span class="brand mono">ZION VAULT</span>
+      <span>v1.2610.8.0 · construído por Douglas Lima</span>
+    </div>
+  </footer>
+
+  <script>
+    const root = document.documentElement;
+    const btn = document.getElementById('themeToggle');
+    btn.addEventListener('click', () => {
+      const current = root.getAttribute('data-theme')
+        || (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+      root.setAttribute('data-theme', current === 'dark' ? 'light' : 'dark');
+    });
+  </script>
+</body>
+</html>
